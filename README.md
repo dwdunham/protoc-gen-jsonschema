@@ -92,6 +92,7 @@ protoc \
 |`enforce_oneof`| Interpret Proto "oneOf" clauses |
 |`enums_as_strings_only`| Only include strings in the allowed values for enums |
 |`file_extension`| Specify a custom file extension for generated schemas |
+|`include_numeric_constraints`| Include OAS minimum and maximum constraints for signed integer types |
 |`include_numeric_format`| Include OAS formats for numeric types |
 |`json_fieldnames`| Use JSON field names only |
 |`prefix_schema_files_with_package`| Prefix the output filename with package |

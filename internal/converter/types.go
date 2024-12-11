@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"math"
 
 	"github.com/alecthomas/jsonschema"
 	"github.com/iancoleman/orderedmap"
@@ -87,72 +88,16 @@ func (c *Converter) convertField(curPkg *ProtoPackage, desc *descriptor.FieldDes
 	// Switch the types, and pick a JSONSchema equivalent:
 	switch desc.GetType() {
 
-	// Float32:
-	case descriptor.FieldDescriptorProto_TYPE_FLOAT:
-		if messageFlags.AllowNullValues {
-			if c.Flags.IncludeNumericFormat {
-				jsonSchemaType.OneOf = []*jsonschema.Type{
-					{Type: gojsonschema.TYPE_NULL},
-					{Type: gojsonschema.TYPE_NUMBER, Format: "float"},
-				}
-			} else {
-				jsonSchemaType.OneOf = []*jsonschema.Type{
-					{Type: gojsonschema.TYPE_NULL},
-					{Type: gojsonschema.TYPE_NUMBER},
-				}
-			}
-		} else {
-			jsonSchemaType.Type = gojsonschema.TYPE_NUMBER
-			if c.Flags.IncludeNumericFormat {
-				jsonSchemaType.Format = "float"
-			}
-		}
-
-	// Double:
-	case descriptor.FieldDescriptorProto_TYPE_DOUBLE:
-		if messageFlags.AllowNullValues {
-			if c.Flags.IncludeNumericFormat {
-				jsonSchemaType.OneOf = []*jsonschema.Type{
-					{Type: gojsonschema.TYPE_NULL},
-					{Type: gojsonschema.TYPE_NUMBER, Format: "double"},
-				}
-			} else {
-				jsonSchemaType.OneOf = []*jsonschema.Type{
-					{Type: gojsonschema.TYPE_NULL},
-					{Type: gojsonschema.TYPE_NUMBER},
-				}
-			}
-		} else {
-			jsonSchemaType.Type = gojsonschema.TYPE_NUMBER
-			if c.Flags.IncludeNumericFormat {
-				jsonSchemaType.Format = "double"
-			}
-		}
-
-	// Int32:
-	case descriptor.FieldDescriptorProto_TYPE_INT32,
+	// Numbers:
+	case descriptor.FieldDescriptorProto_TYPE_FLOAT,
+		descriptor.FieldDescriptorProto_TYPE_DOUBLE,
+		descriptor.FieldDescriptorProto_TYPE_INT32,
 		descriptor.FieldDescriptorProto_TYPE_UINT32,
 		descriptor.FieldDescriptorProto_TYPE_FIXED32,
 		descriptor.FieldDescriptorProto_TYPE_SFIXED32,
 		descriptor.FieldDescriptorProto_TYPE_SINT32:
-		if messageFlags.AllowNullValues {
-			if c.Flags.IncludeNumericFormat {
-				jsonSchemaType.OneOf = []*jsonschema.Type{
-					{Type: gojsonschema.TYPE_NULL},
-					{Type: gojsonschema.TYPE_INTEGER, Format: "int32"},
-				}
-			} else {
-				jsonSchemaType.OneOf = []*jsonschema.Type{
-					{Type: gojsonschema.TYPE_NULL},
-					{Type: gojsonschema.TYPE_INTEGER},
-				}
-			}
-		} else {
-			jsonSchemaType.Type = gojsonschema.TYPE_INTEGER
-			if c.Flags.IncludeNumericFormat {
-				jsonSchemaType.Format = "int32"
-			}
-		}
+		handleNumberType(c.Flags, messageFlags.AllowNullValues, *desc, jsonSchemaType, "", false)
+		break;
 
 	// Int64:
 	case descriptor.FieldDescriptorProto_TYPE_INT64,
@@ -163,47 +108,12 @@ func (c *Converter) convertField(curPkg *ProtoPackage, desc *descriptor.FieldDes
 
 		// As integer:
 		if c.Flags.DisallowBigIntsAsStrings {
-			if messageFlags.AllowNullValues {
-				if c.Flags.IncludeNumericFormat {
-					jsonSchemaType.OneOf = []*jsonschema.Type{
-						{Type: gojsonschema.TYPE_INTEGER, Format: "int64"},
-						{Type: gojsonschema.TYPE_NULL},
-					}
-				} else {
-					jsonSchemaType.OneOf = []*jsonschema.Type{
-						{Type: gojsonschema.TYPE_INTEGER},
-						{Type: gojsonschema.TYPE_NULL},
-					}
-				}
-			} else {
-				jsonSchemaType.Type = gojsonschema.TYPE_INTEGER
-				if c.Flags.IncludeNumericFormat {
-					jsonSchemaType.Format = "int64"
-				}
-			}
-		}
-
+			handleNumberType(c.Flags, messageFlags.AllowNullValues, *desc, jsonSchemaType, "", true)
+		} else {
 		// As string:
-		if !c.Flags.DisallowBigIntsAsStrings {
-			if messageFlags.AllowNullValues {
-				if c.Flags.IncludeNumericFormat {
-					jsonSchemaType.OneOf = []*jsonschema.Type{
-						{Type: gojsonschema.TYPE_STRING, Format: "int64"},
-						{Type: gojsonschema.TYPE_NULL},
-					}
-				} else {
-					jsonSchemaType.OneOf = []*jsonschema.Type{
-						{Type: gojsonschema.TYPE_STRING},
-						{Type: gojsonschema.TYPE_NULL},
-					}
-				}
-			} else {
-				jsonSchemaType.Type = gojsonschema.TYPE_STRING
-				if c.Flags.IncludeNumericFormat {
-					jsonSchemaType.Format = "int64"
-				}
-			}
+			handleNumberType(c.Flags, messageFlags.AllowNullValues, *desc, jsonSchemaType, gojsonschema.TYPE_STRING, true)
 		}
+		break;
 
 	// String:
 	case descriptor.FieldDescriptorProto_TYPE_STRING:
@@ -346,6 +256,10 @@ func (c *Converter) convertField(curPkg *ProtoPackage, desc *descriptor.FieldDes
 			jsonSchemaType.Items.OneOf = jsonSchemaType.OneOf
 			jsonSchemaType.Items.Format = jsonSchemaType.Format
 			jsonSchemaType.Format = ""
+			jsonSchemaType.Items.Minimum = jsonSchemaType.Minimum
+			jsonSchemaType.Minimum = 0
+			jsonSchemaType.Items.Maximum = jsonSchemaType.Maximum
+			jsonSchemaType.Maximum = 0
 		}
 
 		if messageFlags.AllowNullValues {
@@ -454,6 +368,75 @@ func (c *Converter) convertField(curPkg *ProtoPackage, desc *descriptor.FieldDes
 	jsonSchemaType.Required = dedupe(jsonSchemaType.Required)
 
 	return jsonSchemaType, nil
+}
+
+// Return format, type, minimum, maximum, bool for it minimum and maximum are set
+func getSchemaInformation(desc descriptor.FieldDescriptorProto, TypeOverride string) (string, string, int, int, bool) {
+	switch desc.GetType() {
+	case descriptor.FieldDescriptorProto_TYPE_DOUBLE:
+		return "double", gojsonschema.TYPE_NUMBER, 0, 0, false
+	case descriptor.FieldDescriptorProto_TYPE_FLOAT:
+		return "float", gojsonschema.TYPE_NUMBER, 0, 0, false
+	// Unsigned int 32 (doesn't add minimum when minimum is 0, so not setting)
+	case descriptor.FieldDescriptorProto_TYPE_UINT32:
+		return "int32", gojsonschema.TYPE_INTEGER, 0, 0, false
+	// Unsigned int 64 (can't handle a uint here, and java won't parse anything over a math.MaxInt64)
+	case descriptor.FieldDescriptorProto_TYPE_UINT64:
+		return "int64", chooseType(gojsonschema.TYPE_INTEGER, TypeOverride), 0, 0, false
+	// Int32:
+	case descriptor.FieldDescriptorProto_TYPE_INT32,
+		descriptor.FieldDescriptorProto_TYPE_FIXED32,
+		descriptor.FieldDescriptorProto_TYPE_SFIXED32,
+		descriptor.FieldDescriptorProto_TYPE_SINT32:
+		return "int32", gojsonschema.TYPE_INTEGER, math.MinInt32, math.MaxInt32, true
+	// Int64:
+	case descriptor.FieldDescriptorProto_TYPE_INT64,
+		descriptor.FieldDescriptorProto_TYPE_FIXED64,
+		descriptor.FieldDescriptorProto_TYPE_SFIXED64,
+		descriptor.FieldDescriptorProto_TYPE_SINT64:
+		return "int64", chooseType(gojsonschema.TYPE_INTEGER, TypeOverride), math.MinInt64, math.MaxInt64, true
+	default:
+		return "", "", 0, 0, false
+	}
+}
+
+func chooseType(Type string, TypeOverride string) (string) {
+	if (TypeOverride != "") {
+		return TypeOverride
+	}
+	return Type
+}
+
+func updateNumberSchema(messageFlags ConverterFlags, desc descriptor.FieldDescriptorProto, jsonSchemaType *jsonschema.Type, TypeOverride string) {
+	var format, fieldType, minimum, maximum, HasMinMax = getSchemaInformation(desc, TypeOverride)
+	jsonSchemaType.Type = fieldType
+	if (messageFlags.IncludeNumericFormat) {
+		jsonSchemaType.Format = format
+	}
+	if (messageFlags.IncludeNumericConstraints && HasMinMax) {
+		jsonSchemaType.Minimum = minimum
+		jsonSchemaType.Maximum = maximum
+	}
+}
+
+func handleNumberType(flags ConverterFlags, allowNull bool, desc descriptor.FieldDescriptorProto, jsonSchemaType *jsonschema.Type, TypeOverride string, reverse bool) {
+	if (allowNull) {
+		item := &jsonschema.Type{}
+		updateNumberSchema(flags, desc, item, TypeOverride)
+		if (reverse) {
+			jsonSchemaType.OneOf = []*jsonschema.Type{
+				item,
+				{Type: gojsonschema.TYPE_NULL},
+			}
+		} else {
+			jsonSchemaType.OneOf = []*jsonschema.Type{
+				{Type: gojsonschema.TYPE_NULL},
+				item,
+			}
+		}
+	} else {
+		updateNumberSchema(flags, desc, jsonSchemaType, TypeOverride)
+	}
 }
 
 // Converts a proto "MESSAGE" into a JSON-Schema:

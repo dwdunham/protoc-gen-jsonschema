@@ -1,0 +1,16 @@
+syntax = "proto3";
+package samples;
+
+message NumericConstraint {
+    int32 int_val                    = 1;
+    int64 long_val                   = 2;
+    float float_val                  = 3;
+    double double_val                = 4;
+    repeated int32 int_val_array     = 5;
+    repeated int64 long_val_array    = 6;
+    repeated float float_val_array   = 7;
+    repeated double double_val_array = 8;
+    optional int32 optional_int_val  = 9;
+    uint32 uint_val                  = 10;
+    uint64 ulong_val                 = 11;
+}
