@@ -1,6 +1,6 @@
 package testdata
 
-const NumericConstraint = `{
+const NumericConstraintNoString = `{
     "$schema": "http://json-schema.org/draft-04/schema#",
     "$ref": "#/definitions/NumericConstraint",
     "definitions": {
@@ -12,7 +12,9 @@ const NumericConstraint = `{
                     "type": "integer"
                 },
                 "long_val": {
-                    "type": "string"
+                    "maximum": 9223372036854775807,
+                    "minimum": -9223372036854775808,
+                    "type": "integer"
                 },
                 "float_val": {
                     "type": "number"
@@ -30,7 +32,9 @@ const NumericConstraint = `{
                 },
                 "long_val_array": {
                     "items": {
-                        "type": "string"
+                        "maximum": 9223372036854775807,
+                        "minimum": -9223372036854775808,
+                        "type": "integer"
                     },
                     "type": "array"
                 },
@@ -55,7 +59,7 @@ const NumericConstraint = `{
                     "type": "integer"
                 },
                 "ulong_val": {
-                    "type": "string"
+                    "type": "integer"
                 }
             },
             "additionalProperties": true,

@@ -335,6 +335,12 @@ func configureSampleProtos() map[string]sampleProto {
 			FilesToGenerate:       []string{"NumericConstraint.proto"},
 			ProtoFileName:         "NumericConstraint.proto",
 		},
+		"NumericConstraintNoString": {
+			Flags:                 ConverterFlags{IncludeNumericConstraints: true, DisallowBigIntsAsStrings: true},
+			ExpectedJSONSchema:    []string{testdata.NumericConstraintNoString},
+			FilesToGenerate:       []string{"NumericConstraint.proto"},
+			ProtoFileName:         "NumericConstraint.proto",
+		},
 		"OneOf": {
 			Flags:                 ConverterFlags{AllFieldsRequired: true, EnforceOneOf: true},
 			ExpectedJSONSchema:    []string{testdata.OneOf},

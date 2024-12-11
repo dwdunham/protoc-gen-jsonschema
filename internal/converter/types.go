@@ -394,7 +394,11 @@ func getSchemaInformation(desc descriptor.FieldDescriptorProto, TypeOverride str
 		descriptor.FieldDescriptorProto_TYPE_FIXED64,
 		descriptor.FieldDescriptorProto_TYPE_SFIXED64,
 		descriptor.FieldDescriptorProto_TYPE_SINT64:
-		return "int64", chooseType(gojsonschema.TYPE_INTEGER, TypeOverride), math.MinInt64, math.MaxInt64, true
+		var Type = chooseType(gojsonschema.TYPE_INTEGER, TypeOverride)
+		if (Type == gojsonschema.TYPE_INTEGER) {
+			return "int64", Type, math.MinInt64, math.MaxInt64, true
+		}
+		return "int64", Type, 0, 0, false
 	default:
 		return "", "", 0, 0, false
 	}

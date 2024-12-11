@@ -13,8 +13,6 @@ const NumericFormatAndConstraint = `{
                     "format": "int32"
                 },
                 "long_val": {
-                    "maximum": 9223372036854775807,
-                    "minimum": -9223372036854775808,
                     "type": "string",
                     "format": "int64"
                 },
@@ -37,8 +35,6 @@ const NumericFormatAndConstraint = `{
                 },
                 "long_val_array": {
                     "items": {
-                        "maximum": 9223372036854775807,
-                        "minimum": -9223372036854775808,
                         "type": "string",
                         "format": "int64"
                     },
